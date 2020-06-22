@@ -1,0 +1,340 @@
+﻿@model TechnicalTaskInvoice.Models.InvoiceVM
+@{
+    ViewData["Title"] = "Create";
+}
+
+<h1>Create Invoice</h1>
+
+<form asp-action="CreateAsync" asp-controller="Invoice" method="post" id="invoiceForm">
+    <div class="row">
+        <div class="col-lg-6 col-xl-6 col-md-12">
+            <div class="form-group row ">
+                <label asp-for="InvoiceNo" class="col-sm-2 col-lg-3 col-xl-3 col-form-label">Invoice No</label>
+                <div class="col-sm-10 col-lg-9 col-xl-9">
+                    <input type="number" asp-for="InvoiceNo" class="form-control number-input">
+                </div>
+            </div>
+        </div>
+
+        <div class=" col-lg-6 col-xl-6 col-md-12">
+            <div class="form-group row">
+                <label asp-for="Date" class="col-sm-2 col-lg-3 col-xl-3 col-form-label">Invoice Date</label>
+                <div class="col-sm-10 col-lg-9 col-xl-9">
+                    <input type="text" readonly asp-for="Date" class="form-control" value="@DateTime.Now.ToString("yyyy-MM-dd HH:mm")">
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="form-row">
+        <div class="col-12">
+            <div class="form-group row">
+                <label asp-for="@Model.Store.Id" class="col-2 col-form-label">Store</label>
+                <div class="col-sm-10 col-lg-10 col-xl-10">
+                    <select class="custom-select form-control" asp-for="StoreId"
+                            asp-items="@(new SelectList(Model.Stores,"Id","StoreName"))">
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table mt-md-5">
+            <thead>
+                <tr>
+                    <th scope="col">Item</th>
+                    <th scope="col">Unit</th>
+                    <th scope="col">Price</th>
+                    <th scope="col">Qty</th>
+                    <th scope="col">Total</th>
+                    <th scope="col">Discount</th>
+                    <th scope="col">Net</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                <tr>
+                    <td>
+                        <select class="custom-select" id="Items-0" onchange="fillUnits($(this))">
+                            <option selected disabled>Choose Item</option>
+                            @foreach (var item in Model.ItemsDetails.GroupBy(g => g.Item))
+                            {
+                                <option data-units="@string.Join("-", item.Select(x => new { x.Unit.Id,  x.Unit.UnitName, x.Price }).ToList())" value="@item.Key.Id">@item.Key.ItemName</option>
+                            }
+                        </select>
+                    </td>
+                    <td>
+                        <select class="custom-select" id="Units-0" onchange="setPrice($(this))">
+                        </select>
+                    </td>
+                    <td><input type="text" class="form-control" onchange="calculateSubTotal($(this))" readonly row-index="1" id="price-0" /></td>
+                    <td><input type="text" class="form-control number-input" onkeyup="calculateSubTotal($(this))" id="quantity-0" /></td>
+                    <td><input type="text" class="form-control" onchange="calculateSubNet($(this))" readonly id="total-0" /></td>
+                    <td><input type="text" class="form-control number-input" onkeyup="calculateSubNet($(this))" id="discount-0" value="0" /></td>
+                    <td><input type="text" class="form-control" onchange="calculateTotal()" readonly id="net-0" /></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="form-group">
+        <button type="button" class="btn btn-primary" style="float: right;" onclick="addRow()">Add</button>
+    </div>
+
+    <div class="form-group mt-5">
+        <div class="form-group row col-lg-6 col-xl-6 col-md-12">
+            <label class="col-sm-2 col-lg-3 col-xl-3 col-form-label">Total</label>
+            <div class="col-sm-10 col-lg-9 col-xl-9">
+                <input type="number" onchange="calculateNet()" id="total" readonly class="form-control">
+            </div>
+        </div>
+
+        <div class="form-group row col-lg-6 col-xl-6 col-md-12">
+            <label class="col-sm-2 col-lg-3 col-xl-3 col-form-label">Taxes</label>
+            <div class="col-sm-10 col-lg-9 col-xl-9">
+                <input type="number" onkeyup="calculateNet()" id="tax" value="0" name="tax" class="form-control number-input">
+            </div>
+        </div>
+
+        <div class="form-group row col-lg-6 col-xl-6 col-md-12">
+            <label class="col-sm-2 col-lg-3 col-xl-3 col-form-label">Net</label>
+            <div class="col-sm-10 col-lg-9 col-xl-9">
+                <input type="number" id="net" readonly class="form-control">
+            </div>
+        </div>
+    </div>
+
+    <div class="form-group justify-content-center row">
+        <div class="form-group mr-5">
+            <button type="submit" class="btn btn-success" id="save">Save</button>
+        </div>
+        <div class="form-group">
+            <button type="button" class="btn btn-danger" id="delete">Delete</button>
+        </div>
+    </div>
+</form>
+
+<!-- Modal -->
+<div class="modal fade" id="doneModal" role="dialog">
+    <div class="modal-dialog">
+
+        <!-- Modal content-->
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                @*<h4 class="modal-title">Done</h4>*@
+            </div>
+            <div class="modal-body">
+                <p style="color:green; text-align:center;">Data Inserted Successfully</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Modal -->
+<div class="modal fade" id="errorModal" role="dialog">
+    <div class="modal-dialog">
+        <!-- Modal content-->
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="color:red; text-align:center;">Something Went Wrong</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+@section scripts{
+
+    <script>
+        $(function () {
+            $('form').on('submit', function (e) {
+                e.preventDefault()
+                submit()
+            })
+
+            $('.number-input').keydown(function (e) {
+                if (
+                    e.key.length === 1 && e.key !== '.' && isNaN(e.key) && !e.ctrlKey ||
+                    e.key === '.' && e.target.value.toString().indexOf('.') > -1
+                ) {
+                    e.preventDefault();
+                }
+            });
+
+            $('#delete').on('click', function () {
+                location.reload();
+            })
+        })
+
+        function fillUnits(elem) {
+            let elemId = $(elem).attr('id')
+            let rowIndex = elem.attr('id').split('-')[1]
+            let units = $('#' + elemId).find(":selected").data('units')
+
+            if (!units) return false;
+
+            // clear units select
+            $('#Units-' + rowIndex).empty()
+
+            let unitsArray = units.split('-')
+
+            if(unitsArray.length <= 0) return false
+
+            unitsArray.forEach(function (e, i) {
+                let unitId = e.substring(e.indexOf('Id = ') + 'Id = '.length, e.indexOf(','))
+                let unitName = e.substring(e.indexOf('UnitName = ') + 'UnitName = '.length, e.indexOf(', P'))
+                let price = e.substring(e.indexOf('Price = ') + 'Price = '.length, e.indexOf('}') - 1)
+
+                $('#Units-' + rowIndex).append('<option data-price="' + price + '" value="' + unitId + '">' + unitName + '</option>');
+            })
+
+            // trigger price change to assign the price
+            $('#Units-' + rowIndex).trigger('change')
+        }
+
+        function setPrice(elem) {
+            let elemId = $(elem).attr('id')
+            let rowIndex = elem.attr('id').split('-')[1]
+            let price = $('#' + elemId).find(":selected").data('price')
+
+            // assign price value and trigger change
+            // to change total and net values
+            $('#price-' + rowIndex).val(price).change()
+        }
+
+        function addRow() {
+            let rowIndex = $('#tableBody tr').length
+            let row = '<tr>' +
+                        '<td>' +
+                            '<select class="custom-select" id="Items-' + rowIndex +'" onchange="fillUnits($(this))">' +
+                                '<option selected disabled>Choose Item</option>' +
+                                @foreach (var item in Model.ItemsDetails.GroupBy(g => g.Item))
+                                {
+                                    @:'<option data-units="@(string.Join("-", item.Select(x => new { x.Unit.Id,  x.Unit.UnitName, x.Price }).ToList()))" value="@(item.Key.Id)">@(item.Key.ItemName)</option>' +
+                                }
+                            '</select>' +
+                        '</td>' +
+                        '<td>' +
+                        '<select class="custom-select" id="Units-' + rowIndex +'" onchange="setPrice($(this))">' +
+                            '</select>' +
+                        '</td>' +
+                        '<td><input type="text" class="form-control" onchange="calculateSubTotal($(this))" readonly id="price-' + rowIndex +'" /></td>' +
+                        '<td><input type="text" class="form-control number-input" onkeyup="calculateSubTotal($(this))" id="quantity-' + rowIndex +'" /></td>' +
+                        '<td><input type="text" class="form-control" onchange="calculateSubNet($(this))" readonly id="total-' + rowIndex +'" /></td>' +
+                        '<td><input type="text" class="form-control number-input" onkeyup="calculateSubNet($(this))"  id="discount-' + rowIndex +'" value="0"/></td>' +
+                        '<td><input type="text" class="form-control" onchange="calculateTotal()" readonly id="net-' + rowIndex +'" /></td>' +
+                '</tr>'
+            $('#tableBody').append(row)
+        }
+
+        function calculateSubTotal(elem) {
+            let rowIndex = elem.attr('id').split('-')[1]
+
+            // check if price have value else assign it with Zero
+            let price = !$('#price-' + rowIndex).val() ? 0 : $('#price-' + rowIndex).val()
+
+            // check if Quantity have value else assign it with Zero
+            let qty = !$('#quantity-' + rowIndex).val() ? 0 :  $('#quantity-' + rowIndex).val()
+            let total = (parseFloat(price) * parseFloat(qty)).toFixed(2)
+
+            if (!total) total = 0;
+
+            $('#total-' + rowIndex).val(total).change()
+        }
+
+        function calculateSubNet(elem) {
+            let rowIndex = elem.attr('id').split('-')[1]
+            let total = $('#total-' + rowIndex).val()
+
+            // check if Discount have value else assign it with Zero
+            let discount = !$('#discount-' + rowIndex).val() ? 0 : $('#discount-' + rowIndex).val()
+            let net = (parseFloat(total) - parseFloat(discount)).toFixed(2)
+
+            if (!net) net = 0;
+
+            // trigger change to change header total
+            $('#net-' + rowIndex).val(net).change()
+        }
+
+        function calculateTotal() {
+            let rowCount = $('#tableBody tr').length
+            let total = 0
+
+            for (var i = 0; i < rowCount; i++) {
+                total += parseFloat($('#net-' + i).val())
+            }
+            console.log(total)
+
+            // trigger change to change header net
+            $('#total').val(total).change()
+        }
+
+        function calculateNet() {
+            let total = parseFloat($('#total').val())
+            let tax = parseFloat($('#tax').val())
+
+            let net = parseFloat(total + total * tax / 100)
+
+            $('#net').val(net)
+        }
+
+        function submit() {
+            let rowCount = $('#tableBody tr').length
+
+            let invoiceNo = $('#InvoiceNo').val()
+            let store = $('#StoreId').val()
+            let tax = $('#tax').val()
+            let invoieDetails = []
+
+            for (var i = 0; i < rowCount; i++) {
+                invoieDetails.push({
+                    itemId: $('#Items-' + i).val(),
+                    unitId: $('#Units-' + i).val(),
+                    quantity: $('#quantity-' + i).val(),
+                    total: $('#total-' + i).val(),
+                    discount: $('#discount-' + i).val(),
+                    net: $('#net-' + i).val()
+                })
+            }
+
+            let obj = {
+                InvoiceNo: invoiceNo,
+                StoreId: store,
+                Tax: tax,
+                InvoiceDetails: invoieDetails
+            }
+
+            console.log(obj)
+
+            $.ajax({
+                url: '/Invoice/Create',
+                type: 'post',
+                data: obj,
+                success: function (data) {
+                    if (data) {
+                        $('#doneModal').modal('toggle')
+                        $('#tableBody').empty()
+                    } else {
+                        $('#errorModal').modal('toggle')
+                    }
+                },
+                error: function () {
+                    $('#errorModal').modal('toggle')
+                }
+            })
+        }
+
+    </script>
+
+
+}
